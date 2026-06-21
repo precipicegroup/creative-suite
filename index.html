@@ -258,59 +258,6 @@ function mobileCSS(id){
     .panel,.rp,.rpanel,.sidebar,.ctrl,.rp-body,.controls,.right,.left{ -webkit-overflow-scrolling:touch; }
     ::-webkit-scrollbar{ width:4px;height:4px; }
     .ed-pick-btn{ min-width:26px!important; height:26px!important; }
-
-    /* ════ BOTTOM SETTINGS DRAWER ════
-       Settings dock to the bottom as a collapsible sheet. Collapsed by default
-       so the canvas gets almost the whole screen; tap/drag the handle to open.
-       The canvas area is sized to (100dvh − drawer height) so the artwork is
-       NEVER hidden behind the drawer — it shrinks to the space above it. */
-    :root{ --peek:${isPhone?52:48}px; --drawerH:var(--peek); --drawerMax:${isPhone?'48vh':'42vh'}; }
-    html.mDrawer-open{ --drawerH:var(--drawerMax); }
-    #mDrawer{
-      position:fixed; left:0; right:0; bottom:0; height:var(--drawerH);
-      z-index:9000; background:var(--sf,#141109);
-      border-top:1px solid var(--bd2,rgba(200,169,110,.28));
-      box-shadow:0 -10px 30px rgba(0,0,0,.45);
-      border-radius:16px 16px 0 0;
-      display:flex; flex-direction:column;
-      transition:height .28s cubic-bezier(.4,0,.2,1);
-    }
-    #mDrawerHandle{
-      position:relative; height:var(--peek); flex:none;
-      display:flex; align-items:center; justify-content:center;
-      cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
-    }
-    #mDrawerHandle:active{ cursor:grabbing; }
-    #mDrawerHandle .mGrab{ width:40px; height:4px; border-radius:3px; background:rgba(200,169,110,.55); }
-    #mDrawerHandle .mLbl{ position:absolute; left:16px; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ac,#c8a96e); pointer-events:none; white-space:nowrap; }
-    #mDrawerHandle .mChev{ position:absolute; right:16px; font-size:12px; color:var(--ac,#c8a96e); transition:transform .28s; pointer-events:none; }
-    html.mDrawer-open #mDrawerHandle .mChev{ transform:rotate(180deg); }
-    #mDrawerBody{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:2px 12px calc(16px + env(safe-area-inset-bottom)); }
-    html:not(.mDrawer-open) #mDrawerBody{ overflow:hidden; pointer-events:none; }
-    /* moved-in panels fill the drawer width */
-    #mDrawerBody > *{ width:100%!important; max-width:100%!important; max-height:none!important; height:auto!important; border:none!important; flex:none!important; }
-    /* multi-column control layout when the drawer is wide (tablet/landscape) */
-    @media (min-width:760px){
-      #mDrawerBody{ column-width:300px; column-gap:18px; }
-      #mDrawerBody > *{ break-inside:avoid; }
-    }
-
-    /* When the drawer is active, the canvas area fills the space ABOVE it. */
-    html.mDrawer-ready body, html.mDrawer-ready .app, html.mDrawer-ready #app, html.mDrawer-ready .wrap{
-      height:100dvh!important; max-height:100dvh!important; overflow:hidden!important;
-      display:block!important; padding-bottom:0!important;
-    }
-    html.mDrawer-ready .ctr, html.mDrawer-ready #ctr, html.mDrawer-ready .cwrap,
-    html.mDrawer-ready .canvas-wrap, html.mDrawer-ready .canvas-area, html.mDrawer-ready .ca,
-    html.mDrawer-ready .stage, html.mDrawer-ready .preview, html.mDrawer-ready .main,
-    html.mDrawer-ready .canvas-host, html.mDrawer-ready #stage{
-      position:fixed!important; left:0!important; right:0!important; top:0!important;
-      height:calc(100dvh - var(--drawerH))!important;
-      max-height:calc(100dvh - var(--drawerH))!important; min-height:0!important;
-      width:100%!important; margin:0!important;
-      transition:height .28s cubic-bezier(.4,0,.2,1);
-      display:flex!important; align-items:center; justify-content:center; overflow:hidden;
-    }
   `;
 
   // ============ PHONE PROFILES (always single-column stacks) ============
@@ -436,72 +383,6 @@ function mobileCSS(id){
   return map[id] || base+(isPhone?flexSide_p:flexSide_t);
 }
 
-// JS injected into each tool on mobile: collects the tool's settings panel(s)
-// into a collapsible bottom drawer so the canvas stays uncovered. Returns a
-// self-contained script string. Falls back gracefully (leaves the stacked
-// layout) if it can't find panels.
-function mobileDrawerJS(id){
-  // canvas/main containers to NOT move (these stay as the viewing area)
-  const CANVAS_SEL = ".ctr,#ctr,.cwrap,.canvas-wrap,.canvas-area,.ca,.stage,#stage,.preview,.main,.canvas-host";
-  // candidate settings-panel containers per the suite's tools
-  const PANEL_SEL = ".sidebar,.sb,.panel,.rp,.lp,.left,.right,.rpanel,.controls,.controls-left,.controls-right,#leftPanel,#rightPanel,.side,.tools-panel";
-  return `(function(){
-    var TRIES=0, MAXTRIES=24;
-    var CANVAS_SEL=${JSON.stringify(CANVAS_SEL)};
-    var PANEL_SEL=${JSON.stringify(PANEL_SEL)};
-    function fireResize(){ [40,200,420].forEach(function(t){ setTimeout(function(){ try{ window.dispatchEvent(new Event('resize')); }catch(e){} }, t); }); }
-    function build(){
-      try{
-        if(document.getElementById('mDrawer')) return true;
-        if(!document.body) return false;
-        var all=Array.prototype.slice.call(document.querySelectorAll(PANEL_SEL));
-        // keep only top-level panels (not nested inside another matched panel)
-        // and skip anything inside the canvas area
-        var canvases=Array.prototype.slice.call(document.querySelectorAll(CANVAS_SEL));
-        var panels=all.filter(function(p){
-          if(all.some(function(q){ return q!==p && q.contains(p); })) return false;
-          if(canvases.some(function(c){ return c.contains(p) || c===p; })) return false;
-          if(p.closest && p.closest('#mDrawer')) return false;
-          // must be visibly a panel (has some height/children)
-          if(p.children.length===0) return false;
-          return true;
-        });
-        if(!panels.length) return false;
-        // Build the drawer
-        var drawer=document.createElement('div'); drawer.id='mDrawer';
-        var handle=document.createElement('div'); handle.id='mDrawerHandle';
-        handle.innerHTML='<span class="mLbl">Settings</span><span class="mGrab"></span><span class="mChev">▲</span>';
-        var body=document.createElement('div'); body.id='mDrawerBody';
-        drawer.appendChild(handle); drawer.appendChild(body);
-        document.body.appendChild(drawer);
-        // Move panels in (preserves their classes + listeners)
-        panels.forEach(function(p){ body.appendChild(p); });
-        document.documentElement.classList.add('mDrawer-ready');
-        // ── toggle + drag ──
-        var open=false;
-        function setOpen(v){ open=v; document.documentElement.classList.toggle('mDrawer-open',open); fireResize(); }
-        var dragging=false, startY=0, moved=0;
-        handle.addEventListener('click',function(e){ if(moved>8) return; setOpen(!open); });
-        function down(e){ dragging=true; moved=0; startY=(e.touches?e.touches[0].clientY:e.clientY); }
-        function move(e){ if(!dragging) return; var y=(e.touches?e.touches[0].clientY:e.clientY); moved=Math.abs(y-startY); var dy=startY-y; if(dy>40 && !open) setOpen(true); else if(dy<-40 && open) setOpen(false); }
-        function up(){ dragging=false; }
-        handle.addEventListener('touchstart',down,{passive:true});
-        window.addEventListener('touchmove',move,{passive:true});
-        window.addEventListener('touchend',up);
-        handle.addEventListener('mousedown',down);
-        window.addEventListener('mousemove',move);
-        window.addEventListener('mouseup',up);
-        setOpen(false); // collapsed by default → canvas gets the screen
-        fireResize();
-        return true;
-      }catch(e){ return false; }
-    }
-    function attempt(){ if(build()) return; if(++TRIES<MAXTRIES) setTimeout(attempt,180); }
-    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',attempt);
-    else attempt();
-  })();`;
-}
-
 function openApp(id) {
   const dot = document.getElementById('nav-dot');
   document.getElementById('splash').classList.add('hidden');
@@ -528,8 +409,7 @@ function openApp(id) {
       // On phones/tablets, inject a mobile-optimization stylesheet into the
       // tool's HTML so its desktop layout adapts to a small touch screen.
       let htmlText = new TextDecoder('utf-8').decode(bytes);
-      const inject = '<style id="suite-mobile">'+mobileCSS(id)+'</style>'
-                   + '<script id="suite-drawer">'+mobileDrawerJS(id)+'<\/script>';
+      const inject = '<style id="suite-mobile">'+mobileCSS(id)+'</style>';
       if (htmlText.includes('</head>')) htmlText = htmlText.replace('</head>', inject+'</head>');
       else htmlText = inject + htmlText;
       blob = new Blob([htmlText], {type: 'text/html'});
