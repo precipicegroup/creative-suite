@@ -384,16 +384,26 @@ function mobileCSS(id){
     body{ flex-direction:column!important; }
     .app{ flex-direction:column!important; height:100dvh!important; }
     .body{ flex-direction:column!important; overflow:visible!important; }
-    /* Banner's own bottom-sheet FAB isn't wired up, so force the side panels
-       back into the normal flow and stack them vertically instead. */
     .lp,.rp{ position:static!important; transform:none!important; width:100%!important; max-width:100%!important;
              border-radius:0!important; height:auto!important; z-index:auto!important; flex-shrink:0!important;
              border-left:none!important; border-right:none!important; overflow-y:auto!important; }
-    .lp{ max-height:28vh!important; border-bottom:1px solid var(--bd)!important; order:1; }
-    .ca{ min-height:34vh!important; order:2; flex:1 1 auto!important; }
-    .rp{ max-height:34vh!important; border-top:1px solid var(--bd)!important; order:3; }
-    .mob-fab{ display:none!important; } /* dead button — panels are stacked instead */
+    .lp{ max-height:26vh!important; border-bottom:1px solid var(--bd)!important; order:1; }
+    .ca{ min-height:38vh!important; order:2; flex:1 1 auto!important; }
+    .rp{ max-height:30vh!important; border-top:1px solid var(--bd)!important; order:3; }
+    /* keep the banner canvas fitted to its area no matter what fitCanvas computes */
+    #mc{ max-width:100%!important; max-height:100%!important; }
+    .mob-fab{ display:none!important; }
     .toolbar{ overflow-x:auto!important; white-space:nowrap; }
+  `;
+  // Frame Studio keeps its own bottom-sheet; we only fix the display canvas so
+  // an uploaded photo actually shows. The tool's #rc uses max-height:100% inside
+  // nested flex containers, which fails to resolve on phones and renders the
+  // photo off-screen. Absolute-fill + object-fit:contain is reliable.
+  const border_p = `
+    .pw{ position:relative!important; }
+    #rc{ position:absolute!important; top:8px!important; left:8px!important; right:8px!important; bottom:8px!important;
+         width:auto!important; height:auto!important; max-width:none!important; max-height:none!important;
+         object-fit:contain!important; }
   `;
 
   // ============ TABLET PROFILES ============
@@ -468,12 +478,12 @@ function mobileCSS(id){
   // here would fight and break their bottom-sheet.
   const phoneMap = {
     pattern: base+pattern_p, font: base+fontEd_p, board: base+board_p,
-    post: base, sticker: base+flexSide_p, border: base,
+    post: base, sticker: base+flexSide_p, border: base+border_p,
     banner: base+banner_p, composer: base+flexSide_p, logo: base+flexSide_p,
   };
   const tabletMap = {
     pattern: base+pattern_t, font: base+fontEd_t, board: base+board_t,
-    post: base, sticker: base+flexSide_t, border: base,
+    post: base, sticker: base+flexSide_t, border: base+border_p,
     banner: base+banner_t, composer: base+flexSide_t, logo: base+flexSide_t,
   };
   const map = isPhone ? phoneMap : tabletMap;
@@ -586,23 +596,33 @@ function mobileToggleJS(skipSettingsToggle){
       [0,60].forEach(function(t){ setTimeout(function(){ try{ window.dispatchEvent(new Event('resize')); }catch(e){} }, t); });
     }
 
-    // Tap a slider in the menu → focus it. A tap (little movement) opens the
-    // focus bar; a horizontal drag still adjusts in place; a vertical drag scrolls.
+    // Tap a slider in the menu → focus it. We only treat it as a tap (and open
+    // the focus bar) when the finger barely moved AND the gesture was quick AND
+    // the page/panel didn't scroll. Any real scroll or drag is ignored, so
+    // navigating the menu never collapses it.
     var td=null;
+    function scrollPos(){ // capture nearest scrollable ancestor positions
+      return { y: (window.pageYOffset||0), t: Date.now() };
+    }
     document.addEventListener('touchstart',function(e){
+      if(e.touches.length>1){ td=null; return; }
       var inp=e.target&&e.target.closest&&e.target.closest('input[type=range]');
       if(!inp||inp.id==='mFocusRange'){ td=null; return; }
       var t=e.touches[0];
-      td={inp:inp,x:t.clientX,y:t.clientY,val:inp.value,moved:false};
+      td={inp:inp,x:t.clientX,y:t.clientY,val:inp.value,moved:false,t0:Date.now(),sy0:(window.pageYOffset||0)};
     },{passive:true});
     document.addEventListener('touchmove',function(e){
       if(!td) return;
+      if(e.touches.length>1){ td.moved=true; return; }
       var t=e.touches[0];
-      if(Math.abs(t.clientX-td.x)>10||Math.abs(t.clientY-td.y)>10) td.moved=true;
+      // a much tighter threshold — any noticeable movement = scroll/drag, not a tap
+      if(Math.abs(t.clientX-td.x)>6||Math.abs(t.clientY-td.y)>6) td.moved=true;
     },{passive:true});
     document.addEventListener('touchend',function(){
       if(!td) return; var t=td; td=null;
-      if(!t.moved){ t.inp.value=t.val; openFocus(t.inp); }   // tap → restore nudge + focus
+      var quick = (Date.now()-t.t0) < 350;
+      var scrolled = Math.abs((window.pageYOffset||0)-t.sy0) > 2;
+      if(!t.moved && quick && !scrolled){ t.inp.value=t.val; openFocus(t.inp); }
     },{passive:true});
 
     if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
