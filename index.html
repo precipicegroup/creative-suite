@@ -551,8 +551,9 @@ function mobileToggleJS(skipSettingsToggle){
       if(row){ var v=row.querySelector('.val,.sv,.value,.v'); if(v&&v.textContent.trim()) return v.textContent.trim().slice(0,8); }
       return String(fRange.value);
     }
+    var lastFocused=null;
     function openFocus(inp){
-      curInput=inp;
+      curInput=inp; lastFocused=inp;
       fRange.min=(inp.min!==''&&inp.min!=null)?inp.min:0;
       fRange.max=(inp.max!==''&&inp.max!=null)?inp.max:100;
       fRange.step=(inp.step!==''&&inp.step!=null)?inp.step:'any';
@@ -560,8 +561,30 @@ function mobileToggleJS(skipSettingsToggle){
       fLabel.textContent=labelFor(inp);
       fVal.textContent=readVal();
       document.documentElement.classList.add('mFocus');
+      // Reveal the viewing screen immediately — no tap needed. Force a reflow so
+      // the panel-collapse paints right away, bring the main canvas to the top of
+      // the view, and nudge the tool to repaint to the now-cleared space.
+      try{ void document.documentElement.offsetHeight; }catch(e){}
+      try{
+        if(window.scrollTo) window.scrollTo(0,0);
+        // pick the LARGEST canvas (the main preview, not a thumbnail)
+        var cvs=[].slice.call(document.querySelectorAll('canvas')), cv=null, best=0;
+        for(var i=0;i<cvs.length;i++){ var r=cvs[i].getBoundingClientRect(); var a=r.width*r.height; if(a>best){best=a;cv=cvs[i];} }
+        if(cv && cv.scrollIntoView) cv.scrollIntoView({block:'start',inline:'nearest'});
+      }catch(e){}
+      [0,50,180].forEach(function(t){ setTimeout(function(){ try{ window.dispatchEvent(new Event('resize')); }catch(e){} }, t); });
     }
-    function closeFocus(){ document.documentElement.classList.remove('mFocus'); curInput=null; }
+    function closeFocus(){
+      document.documentElement.classList.remove('mFocus');
+      var inp=lastFocused; curInput=null;
+      // Go back to the MENU (not the canvas): scroll the control we were just
+      // editing back into view now that the panels are visible again.
+      try{ void document.documentElement.offsetHeight; }catch(e){}
+      try{
+        if(inp && inp.scrollIntoView) inp.scrollIntoView({block:'center'});
+      }catch(e){}
+      [0,60].forEach(function(t){ setTimeout(function(){ try{ window.dispatchEvent(new Event('resize')); }catch(e){} }, t); });
+    }
 
     // Tap a slider in the menu → focus it. A tap (little movement) opens the
     // focus bar; a horizontal drag still adjusts in place; a vertical drag scrolls.
