@@ -59,6 +59,17 @@ nav{
 }
 .nav-dot.pulse{opacity:1;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+.nav-new{
+  margin-left:14px; flex-shrink:0; cursor:pointer;
+  font-family:inherit; font-size:11px; font-weight:600; letter-spacing:.06em;
+  padding:7px 14px; border-radius:8px;
+  border:1px solid var(--bd2,rgba(200,169,110,0.4)); background:rgba(200,169,110,0.1); color:var(--ac,#c8a96e);
+  transition:background .2s,border-color .2s; white-space:nowrap;
+}
+.nav-new:hover{ background:rgba(200,169,110,0.2); border-color:var(--ac,#c8a96e); }
+.nav-new:active{ transform:translateY(1px); }
+/* the nav-dot uses margin-left:auto to push right; keep the New button pinned right too */
+.nav-new{ margin-left:10px; }
 
 /* Bottom tab bar - mobile */
 .bot-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(60px + env(safe-area-inset-bottom));background:var(--sf);border-top:1px solid var(--bd);z-index:200;padding-bottom:env(safe-area-inset-bottom)}
@@ -107,6 +118,7 @@ html.is-phone{ --nav-h:46px; --bot-h:calc(58px + env(safe-area-inset-bottom)); }
 html.is-phone nav{padding:0 12px;gap:3px;padding-top:env(safe-area-inset-top)}
 html.is-phone .nav-brand{font-size:14px;margin-right:0}
 html.is-phone .nav-brand span,html.is-phone .nav-sep,html.is-phone .nav-tabs,html.is-phone .nav-dot{display:none}
+html.is-phone .nav-new{ margin-left:auto; padding:7px 12px; font-size:11px; }
 html.is-phone .bot-nav{display:block;padding-bottom:env(safe-area-inset-bottom)}
 html.is-phone #app-container{height:calc(100dvh - var(--nav-h) - var(--bot-h));margin-bottom:var(--bot-h)}
 html.is-phone .splash-title{font-size:24px}
@@ -153,6 +165,7 @@ html.is-tablet .splash-card{min-width:calc(33.33% - 7px);max-width:calc(33.33% -
     <button class="nav-tab" onclick="openApp('sticker')" id="tab-sticker"><span class="icon">✸</span> Sticker Studio</button>
   </div>
   <div class="nav-dot" id="nav-dot"></div>
+  <button class="nav-new" id="nav-new" onclick="startNewApp()" title="Clear this tool and start fresh">↻ Start New</button>
 </nav>
 
 <div id="app-container">
@@ -370,9 +383,16 @@ function mobileCSS(id){
   const banner_p = `
     body{ flex-direction:column!important; }
     .app{ flex-direction:column!important; height:100dvh!important; }
-    .lp{ width:100%!important; max-width:100%!important; max-height:28vh!important; border-right:none!important; border-bottom:1px solid var(--bd)!important; overflow-y:auto!important; flex-shrink:0!important; order:1; }
+    .body{ flex-direction:column!important; overflow:visible!important; }
+    /* Banner's own bottom-sheet FAB isn't wired up, so force the side panels
+       back into the normal flow and stack them vertically instead. */
+    .lp,.rp{ position:static!important; transform:none!important; width:100%!important; max-width:100%!important;
+             border-radius:0!important; height:auto!important; z-index:auto!important; flex-shrink:0!important;
+             border-left:none!important; border-right:none!important; overflow-y:auto!important; }
+    .lp{ max-height:28vh!important; border-bottom:1px solid var(--bd)!important; order:1; }
     .ca{ min-height:34vh!important; order:2; flex:1 1 auto!important; }
-    .rp{ width:100%!important; max-width:100%!important; max-height:38vh!important; border-left:none!important; border-top:1px solid var(--bd)!important; overflow-y:auto!important; flex-shrink:0!important; order:3; }
+    .rp{ max-height:34vh!important; border-top:1px solid var(--bd)!important; order:3; }
+    .mob-fab{ display:none!important; } /* dead button — panels are stacked instead */
     .toolbar{ overflow-x:auto!important; white-space:nowrap; }
   `;
 
@@ -442,31 +462,42 @@ function mobileCSS(id){
     .toolbar{ overflow-x:auto!important; white-space:nowrap; }
   `;
 
+  // Border (Frame) and Post have their OWN complete mobile UIs (a wired bottom-
+  // sheet + floating button), so we inject only the safe base (touch sizing +
+  // focus mode) and let their own @media handle the layout — injecting a profile
+  // here would fight and break their bottom-sheet.
   const phoneMap = {
     pattern: base+pattern_p, font: base+fontEd_p, board: base+board_p,
-    post: base+post_p, sticker: base+flexSide_p, border: base+flexSide_p,
+    post: base, sticker: base+flexSide_p, border: base,
     banner: base+banner_p, composer: base+flexSide_p, logo: base+flexSide_p,
   };
   const tabletMap = {
     pattern: base+pattern_t, font: base+fontEd_t, board: base+board_t,
-    post: base+post_t, sticker: base+flexSide_t, border: base+flexSide_t,
+    post: base, sticker: base+flexSide_t, border: base,
     banner: base+banner_t, composer: base+flexSide_t, logo: base+flexSide_t,
   };
   const map = isPhone ? phoneMap : tabletMap;
   return map[id] || base+(isPhone?flexSide_p:flexSide_t);
 }
+// Tools that ship their own mobile bottom-sheet + floating button. For these the
+// shell must NOT add its own "Settings" toggle (it would duplicate/conflict).
+const SELF_RESPONSIVE = { border:1, post:1 };
 
 // Mobile helper: (1) a floating "Settings" button that collapses the bottom
 // panels, and (2) FOCUS MODE — tap any slider and just that control drops to a
 // thin bar at the bottom so you can edit it while watching the canvas live, with
 // a back arrow to return to the menu. It never moves the tool's own elements
 // (the focus bar forwards edits to the real control), so it can't break rendering.
-function mobileToggleJS(){
+function mobileToggleJS(skipSettingsToggle){
   return `(function(){
+    var SKIP_TOGGLE = ${skipSettingsToggle?'true':'false'};
     function init(){
       try{
         if(!document.body) return;
-        if(!document.getElementById('ctToggle')){
+        // Add the shell's "Settings" collapse button unless this is a
+        // self-responsive tool (Border/Post) that has its own wired bottom-sheet
+        // + floating button — adding ours there would duplicate/conflict.
+        if(!SKIP_TOGGLE && !document.getElementById('ctToggle')){
           var b=document.createElement('button');
           b.id='ctToggle'; b.type='button';
           b.innerHTML='<span id="ctLbl">Hide Settings</span><span id="ctChev">\\u25BE</span>';
@@ -574,42 +605,58 @@ function openApp(id) {
   current = id;
   const pane = document.getElementById('pane-' + id);
   if (!loaded[id]) {
-    dot.classList.add('pulse');
-    const binary = atob(APPS[id]);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    let blob;
-    if (IS_MOBILE) {
-      // On phones/tablets, inject a mobile-optimization stylesheet into the
-      // tool's HTML so its desktop layout adapts to a small touch screen.
-      let htmlText = new TextDecoder('utf-8').decode(bytes);
-      const inject = '<style id="suite-mobile">'+mobileCSS(id)+'</style>'
-                   + '<script id="suite-toggle">'+mobileToggleJS()+'<\/script>';
-      if (htmlText.includes('</head>')) htmlText = htmlText.replace('</head>', inject+'</head>');
-      else htmlText = inject + htmlText;
-      blob = new Blob([htmlText], {type: 'text/html'});
-    } else {
-      blob = new Blob([bytes], {type: 'text/html'});
-    }
-    pane.src = URL.createObjectURL(blob);
-    iframes[id] = pane;
-    pane.onload = () => {
-      loaded[id] = true;
-      dot.classList.remove('pulse');
-      pane.classList.add('visible');
-      requestAnimationFrame(() => requestAnimationFrame(() => pane.classList.add('faded-in')));
-      // On mobile, nudge the tool to recompute its canvas size against the
-      // new stacked layout (most tools listen for window resize).
-      if (IS_MOBILE) {
-        setTimeout(() => { try { pane.contentWindow.dispatchEvent(new Event('resize')); } catch(e){} }, 120);
-        setTimeout(() => { try { pane.contentWindow.dispatchEvent(new Event('resize')); } catch(e){} }, 450);
-      }
-    };
-    loaded[id] = 'loading';
+    loadIntoPane(id, pane);
   } else if (loaded[id] === true) {
     pane.classList.add('visible');
     requestAnimationFrame(() => requestAnimationFrame(() => pane.classList.add('faded-in')));
   }
+}
+
+// Build the tool's HTML into a fresh blob and load it into its iframe pane.
+// Used both for first open and for "Start New" (which forces a clean reload).
+function loadIntoPane(id, pane) {
+  const dot = document.getElementById('nav-dot');
+  if (dot) dot.classList.add('pulse');
+  const binary = atob(APPS[id]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  let htmlText = new TextDecoder('utf-8').decode(bytes);
+  // Inject the mobile optimizations (phones/tablets only).
+  if (IS_MOBILE) {
+    const inject = '<style id="suite-mobile">'+mobileCSS(id)+'</style>'
+                 + '<script id="suite-toggle">'+mobileToggleJS(!!SELF_RESPONSIVE[id])+'<\/script>';
+    htmlText = htmlText.includes('</head>') ? htmlText.replace('</head>', inject+'</head>') : inject + htmlText;
+  }
+  const blob = new Blob([htmlText], {type: 'text/html'});
+  if (pane._blobUrl) { try { URL.revokeObjectURL(pane._blobUrl); } catch(e){} }
+  pane._blobUrl = URL.createObjectURL(blob);
+  pane.src = pane._blobUrl;
+  iframes[id] = pane;
+  pane.onload = () => {
+    loaded[id] = true;
+    if (dot) dot.classList.remove('pulse');
+    pane.classList.add('visible');
+    requestAnimationFrame(() => requestAnimationFrame(() => pane.classList.add('faded-in')));
+    if (IS_MOBILE) {
+      setTimeout(() => { try { pane.contentWindow.dispatchEvent(new Event('resize')); } catch(e){} }, 120);
+      setTimeout(() => { try { pane.contentWindow.dispatchEvent(new Event('resize')); } catch(e){} }, 450);
+    }
+  };
+  loaded[id] = 'loading';
+}
+
+// "Start New" — reload the currently open tool from scratch, clearing all work.
+function startNewApp() {
+  if (!current) return;
+  const id = current;
+  const ok = window.confirm('Start new in this tool? This clears your current work here.');
+  if (!ok) return;
+  const pane = document.getElementById('pane-' + id);
+  if (!pane) return;
+  pane.classList.remove('faded-in');
+  pane.classList.remove('visible');
+  loaded[id] = false;
+  loadIntoPane(id, pane);
 }
 
 // When the device rotates (especially iPad portrait↔landscape), nudge every
