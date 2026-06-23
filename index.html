@@ -328,7 +328,9 @@ function mobileCSS(id){
     html.mFocus .controls-right, html.mFocus .rpanel, html.mFocus .sb, html.mFocus .sidebar-l,
     html.mFocus .sidebar-r, html.mFocus #leftPanel, html.mFocus #rightPanel, html.mFocus #ctToggle{
       max-height:0!important; min-height:0!important; padding-top:0!important; padding-bottom:0!important;
-      margin:0!important; overflow:hidden!important; border:none!important; opacity:0!important; pointer-events:none!important;
+      margin:0!important; overflow:hidden!important; border:none!important; opacity:0!important;
+      visibility:hidden!important; transform:translateY(120%)!important; pointer-events:none!important;
+      -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
     }
     /* canvas takes the whole screen above the thin focus bar */
     html.mFocus .ctr, html.mFocus #ctr, html.mFocus .cwrap, html.mFocus .canvas-wrap,
@@ -341,7 +343,8 @@ function mobileCSS(id){
     html.mFocus .mob-backdrop, html.mFocus .backdrop, html.mFocus .scrim,
     html.mFocus .overlay-bg, html.mFocus .panel-backdrop, html.mFocus .sheet-backdrop,
     html.mFocus .mob-fabs, html.mFocus .mob-fab{
-      display:none!important; opacity:0!important; pointer-events:none!important;
+      display:none!important; opacity:0!important; visibility:hidden!important; pointer-events:none!important;
+      -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
     }
     #mFocusBack{
       flex:none; width:36px; height:36px; border-radius:10px; cursor:pointer;
