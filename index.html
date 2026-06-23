@@ -335,6 +335,14 @@ function mobileCSS(id){
     html.mFocus .canvas-area, html.mFocus .ca, html.mFocus .stage, html.mFocus .preview, html.mFocus .main{
       max-height:none!important;
     }
+    /* Some tools dim the canvas with a dark scrim behind their own slide-up
+       panels. While focusing a single control we hide that scrim (and any FABs)
+       so the pattern/preview is fully visible with nothing on top of it. */
+    html.mFocus .mob-backdrop, html.mFocus .backdrop, html.mFocus .scrim,
+    html.mFocus .overlay-bg, html.mFocus .panel-backdrop, html.mFocus .sheet-backdrop,
+    html.mFocus .mob-fabs, html.mFocus .mob-fab{
+      display:none!important; opacity:0!important; pointer-events:none!important;
+    }
     #mFocusBack{
       flex:none; width:36px; height:36px; border-radius:10px; cursor:pointer;
       border:1px solid rgba(200,169,110,0.45); background:rgba(200,169,110,0.14); color:#c8a96e;
