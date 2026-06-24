@@ -329,8 +329,7 @@ function mobileCSS(id){
     html.mFocus .sidebar-r, html.mFocus #leftPanel, html.mFocus #rightPanel, html.mFocus #ctToggle{
       max-height:0!important; min-height:0!important; padding-top:0!important; padding-bottom:0!important;
       margin:0!important; overflow:hidden!important; border:none!important; opacity:0!important;
-      visibility:hidden!important; transform:translateY(120%)!important; pointer-events:none!important;
-      -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+      pointer-events:none!important; -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
     }
     /* canvas takes the whole screen above the thin focus bar */
     html.mFocus .ctr, html.mFocus #ctr, html.mFocus .cwrap, html.mFocus .canvas-wrap,
@@ -616,6 +615,14 @@ function mobileToggleJS(skipSettingsToggle){
       return { y: (window.pageYOffset||0), t: Date.now() };
     }
     document.addEventListener('touchstart',function(e){
+      // If we're focusing one control and the user taps anywhere that ISN'T the
+      // focus bar, exit focus mode (restores the full menu + buttons). This means
+      // focus can never get "stuck" hiding the menu — a tap on the canvas brings
+      // everything back.
+      if(document.documentElement.classList.contains('mFocus')){
+        var onBar = e.target && e.target.closest && e.target.closest('#mFocusBar');
+        if(!onBar){ closeFocus(); td=null; return; }
+      }
       if(e.touches.length>1){ td=null; return; }
       var inp=e.target&&e.target.closest&&e.target.closest('input[type=range]');
       if(!inp||inp.id==='mFocusRange'){ td=null; return; }
